@@ -107,15 +107,4 @@ leaflet(df[-14,]) %>% addProviderTiles("OpenStreetMap.BlackAndWhite") %>% addPol
 
 
 
-leaflet() %>%
-  addPolylines(data = x.hatch,
-               weight = 2,
-               #smoothFactor = 0.5,
-               fillColor = c("#FFFF99"),
-               opacity = 1,
-               #dashArray = "3",
-               fillOpacity = 1#,
-               #color = c( "#7FC97F")
-               )
-
 
