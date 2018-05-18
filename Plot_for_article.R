@@ -53,11 +53,19 @@ centers$variable <- c(NA,"CHL",NA,"SST",NA,NA,"SST",NA,NA,NA,
 df@data$variable <- c(NA,"CHL",NA,"SST",NA,NA,"SST",NA,NA,NA,
                       "CHL","CHL",NA,"CHL,PIC:POC",NA,"SST",NA,NA,"PIC:POC")
 
+
+#devtools::install_github("statnmap/HatchedPolygons")
+library(HatchedPolygons)
+x.hatch_1 <- hatched.SpatialPolygons(fao.union[14,], density = c(0.6, 0.3), angle = c(45, 135))
+x.hatch_2 <- hatched.SpatialPolygons(fao.union[14,], density = c(0.3, 0.6), angle = c(45, 135))
+
+plot(x.hatch)
+
 #RColorBrewer::display.brewer.all()
 factpal <- colorFactor(brewer.pal(4,"Accent"), df$variable, na.color = "#FFFFFF")
 #factpal(df$variable)
 
-leaflet(df) %>% addProviderTiles("OpenStreetMap.BlackAndWhite") %>% addPolygons(
+leaflet(df[-14,]) %>% addProviderTiles("OpenStreetMap.BlackAndWhite") %>% addPolygons(
     fillColor = ~factpal(variable),
     weight = 2,
     smoothFactor = 0.5,
@@ -65,6 +73,26 @@ leaflet(df) %>% addProviderTiles("OpenStreetMap.BlackAndWhite") %>% addPolygons(
     color = "grey",
     dashArray = "3",
     fillOpacity = 0.8) %>%
+    addPolylines(data = x.hatch_1,
+                 weight = 4,
+                 smoothFactor = 0.5,
+                 opacity = 1,
+                 #dashArray = "3",
+                 fillOpacity = 1,
+               color = c( "#7FC97F"))%>%
+  addPolylines(data = x.hatch_2,
+               weight = 4,
+               smoothFactor = 0.5,
+               opacity = 1,
+               #dashArray = "3",
+               fillOpacity = 1,
+               color = c( "#FDC086"))%>%
+  addPolylines(data = fao.union[14,],
+               weight = 2,
+               smoothFactor = 0.5,
+               opacity = 0.5,
+               color = "grey",
+               dashArray = "3") %>%
   #addLegend(pal = pal, values = c(0,1), labFormat = labelFormat(suffix = " Tonnes/km^2"),
   #          opacity = 1, title = sprintf('Fishery Capture rate, %s', format(2006,format='%Y')))%>%
   setView(0,0, 2)%>%
@@ -76,3 +104,18 @@ leaflet(df) %>% addProviderTiles("OpenStreetMap.BlackAndWhite") %>% addPolygons(
                       labelOptions = labelOptions(noHide = T, direction = 'top', textOnly = T,
                                                   style = list("font-family" = "serif",
                                                                "font-style" = "italic")))
+
+
+
+leaflet() %>%
+  addPolylines(data = x.hatch,
+               weight = 2,
+               #smoothFactor = 0.5,
+               fillColor = c("#FFFF99"),
+               opacity = 1,
+               #dashArray = "3",
+               fillOpacity = 1#,
+               #color = c( "#7FC97F")
+               )
+
+
