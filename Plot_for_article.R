@@ -30,7 +30,7 @@ marine_areas <- marine_areas[order(marine_areas$zone, decreasing = F),-3]
 
 fao.union@data <- merge( fao.union@data,marine_areas[,-2], by = "zone")
 fao.union@data[,3:15] <- fao.union@data[,3:15]/fao.union@data[,2]
-fao.union@data <- fao.union@data[,c(-2,-16)]
+fao.union@data <- fao.union@data[,c(-2)]
 
 
 pal <- (colorBin("viridis", domain = fao.union$X2014))
