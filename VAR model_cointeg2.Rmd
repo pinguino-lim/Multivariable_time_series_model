@@ -441,22 +441,22 @@ summary(model_88)
 ```
 ## Forcasting. 
 ```{r,echo=FALSE, warning=FALSE, message=FALSE}
-cat("FAO 21")
-plot(predict(model_21,5))
-cat("FAO 31")
-plot(predict(model_31,5))
-cat("FAO 41")
-plot(predict(model_41,5))
-cat("FAO 57")
-plot(predict(model_57,5))
-cat("FAO 58")
-plot(predict(model_58,5))
-cat("FAO 67")
-plot(predict(model_67,5))
-cat("FAO 77")
-plot(predict(vectovar,5))
-cat("FAO 88")
-plot(predict(model_88,5))
+#cat("FAO 21")
+#plot(predict(model_21,5))
+#cat("FAO 31")
+#plot(predict(model_31,5))
+#cat("FAO 41")
+#plot(predict(model_41,5))
+#cat("FAO 57")
+#plot(predict(model_57,5))
+#cat("FAO 58")
+#plot(predict(model_58,5))
+#cat("FAO 67")
+#plot(predict(model_67,5))
+#cat("FAO 77")
+#plot(predict(vectovar,5))
+#cat("FAO 88")
+#plot(predict(model_88,5))
 
 
 single_model <- mdply(cbind(list(model_21, model_31, model_41,model_57,model_58,model_67,vectovar,model_88),
@@ -474,14 +474,13 @@ single_model <- mdply(cbind(list(model_21, model_31, model_41,model_57,model_58,
                       })
 
 single_model <- single_model[,-1]
-colnames(single_model)
+#colnames(single_model)
 
-lapply(c("21","31","41","57","58","67","77","88"),function(z) { 
+lm_test <- lapply(c("21","31","41","57","58","67","77","88"),function(z) { 
   dd <- single_model[single_model$zone %in% z,]
   ss <- summary(lm(fcst ~ year, dd))
  
   ff <- ss$fstatistic
-  if 
   print(z)
   print(ss$coefficients)
  # print(pf(ff[1],ff[2],ff[3],lower.tail=F))
@@ -511,7 +510,7 @@ gvar
 #Sys.setenv("plotly_username"="pinguino.lim")
 #Sys.setenv("plotly_api_key"="wMn1rceswv2Jabna8G3K")
 
-
+#fao.union@data[order(fao.union$X2014, decreasing = T),]
 
 
 ```
