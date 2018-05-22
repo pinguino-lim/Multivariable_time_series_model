@@ -589,5 +589,54 @@ global_model <-  VAR(global_level[,c("tasa_FAO","sst")], lag.max = 2, ic = c("AI
 summary(global_model)
 
 serial.test(global_model, lags.pt=2)
+#plot(predict(global_model,n.ahead=5, ci=0.95))
+
+single_g_model <- mdply(cbind(list(global_model),
+                            c("Global")),
+                      function(m,c){
+                        pred <- predict(m,n.ahead=5, ci=0.95)
+                        endo <- cbind.data.frame(pred$endog[,1],pred$endog[,1],
+                                                 pred$endog[,1],pred$endog[,1])
+                        colnames(endo) <- c("fcst","lower","upper","CI")
+                        df <- as.data.frame(rbind(endo,pred$fcst$tasa_FAO))
+                        df$year <- 2002:2020
+                        df$zone <- rep(c,19)
+                        
+                        return(df)
+                      })
+
+single_g_model <- single_g_model[,-1]
+#colnames(single_model)
+
+lm_test <- lapply(c("Global"),function(z) { 
+  dd <- single_g_model[single_g_model$zone %in% z,]
+  ss <- summary(lm(fcst ~ year, dd))
+ 
+  ff <- ss$fstatistic
+  print(z)
+  print(ss$coefficients)
+ # print(pf(ff[1],ff[2],ff[3],lower.tail=F))
+  })
+
+
+#ㅇㅕ기 할차례
+#그래프만들자
+
+library(plotly)
+#packageVersion('plotly')
+
+
+
+gvar <- plot_ly(single_g_model,x = ~year, y = ~fcst, color = ~zone)%>%
+  layout(yaxis = list (title = "Capture rate (tonnes/km^2)"),
+         xaxis = list (title = "Year"))%>%
+  add_lines()%>%
+  add_ribbons(showlegend = F,
+              ymin = ~lower,
+              ymax = ~upper,
+              line = list(color = 'rgba(7, 164, 181, 0.05)'),
+              fillcolor = 'rgba(7, 164, 181, 0.2)')
+
+gvar
 
 ```
