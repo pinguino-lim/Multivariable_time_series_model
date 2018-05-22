@@ -8,7 +8,9 @@ library(SpatialTools)
 library(geosphere)
 
 CRSWG84 <- CRS(" +proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
-setwd("~/Dropbox/carto/cartografia_censo2011_nacional/")
+setwd("~/Dropbox/data/FAO_AREAS")
+fao <- readShapeSpatial("FAO_AREAS.shp",
+                        proj4string = CRSWG84)
 fao.union <- (unionSpatialPolygons(fao, fao$F_AREA))
 zone <- row.names(fao.union)
 fao.union <- SpatialPolygonsDataFrame(fao.union,
@@ -65,7 +67,7 @@ plot(x.hatch)
 factpal <- colorFactor(brewer.pal(4,"Accent"), df$variable, na.color = "#FFFFFF")
 #factpal(df$variable)
 
-leaflet(df[-14,]) %>% addProviderTiles("OpenStreetMap.BlackAndWhite") %>% addPolygons(
+m <-leaflet(df[-14,]) %>% addProviderTiles("OpenStreetMap.BlackAndWhite") %>% addPolygons(
     fillColor = ~factpal(variable),
     weight = 2,
     smoothFactor = 0.5,
@@ -107,4 +109,8 @@ leaflet(df[-14,]) %>% addProviderTiles("OpenStreetMap.BlackAndWhite") %>% addPol
 
 
 
+library(htmlwidgets)
+setwd("~/Dropbox/TESIS/R_code/Theme 1.8")
+
+saveWidget(m, file="map.html")
 
