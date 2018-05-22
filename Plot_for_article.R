@@ -45,6 +45,8 @@ centers <- data.frame(gCentroid(fao.union, byid = TRUE))
 centers[,3:4] <- marine_areas[,1:2]
 colnames(centers)[3:4] = c("zone","region")
 centers[19,1] <- centers[19,1]-50
+centers[1,1] <- centers[1,1]-130
+centers[1,2] <- centers[1,2]-10
 centers[17,1] <- centers[17,1]-100
 centers[c(13,15),1] <- centers[c(13,15),1]+30
 centers[8,2] <- centers[8,2]-10
@@ -106,7 +108,7 @@ m <-leaflet(df[-14,]) %>% addProviderTiles("OpenStreetMap.BlackAndWhite") %>% ad
                       labelOptions = labelOptions(noHide = T, direction = 'top', textOnly = T,
                                                   style = list("font-family" = "serif",
                                                                "font-style" = "italic")))
-
+m
 
 
 library(htmlwidgets)
