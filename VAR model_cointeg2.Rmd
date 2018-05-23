@@ -522,14 +522,14 @@ single_model <- mdply(cbind(list(model_21, model_31, model_41,model_57,model_58,
                       "chl","chl","chl","pic.poc","sst","pic.poc")),
                       function(m,c,p){
                         pred <- predict(m,n.ahead=5, ci=0.95)
-                        df <- cbind.data.frame(as.data.frame(pred$endog)[p],
+                        endo <- cbind.data.frame(as.data.frame(pred$endog)[p],
                                                as.data.frame(pred$endog)[p],
                                                 as.data.frame(pred$endog)[p],
                                                as.data.frame(pred$endog)[p])
-                        colnames(df) <- c("fcst","lower","upper","CI")
-                        #df <- as.data.frame(rbind(endo,eval(parse(text=sprintf("pred$fcst$%s", p)))))
-                        df$year <- 2002:2015
-                        df$zone <- rep(c,14)
+                        colnames(endo) <- c("fcst","lower","upper","CI")
+                        df <- as.data.frame(rbind(endo,eval(parse(text=sprintf("pred$fcst$%s", p)))))
+                        df$year <- 2002:2020
+                        df$zone <- rep(c,19)
                         df$variable <- p
                         
                         return(df)
@@ -549,8 +549,7 @@ lm_test <- lapply(c("21","31","41","57","58","67_chl","67_pp","77","88"),functio
   })
 
 
-#ㅇㅕ기 할차례
-#그래프만들자
+
 
 library(plotly)
 #packageVersion('plotly')
