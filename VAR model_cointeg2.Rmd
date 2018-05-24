@@ -254,6 +254,26 @@ cointeg <- function(fao_zone){
 
 # FAO area scale
 ```{r,echo=FALSE, warning=FALSE, message=FALSE}
+
+resume <- ldply(levels(FAO_cap$zone), function(z){
+  df <- makedf(z)[,-5]
+  dd <- data.frame("zone" = c(z,z),"test"=c("mean","sd"))
+  dd[,2:5+1] <- rbind(apply(df, 2, mean),
+  apply(df, 2, sd))
+  colnames(dd)[2:5+1] <- c("tasa_FAO", "sst","chl","pic.poc")
+  return(dd)})
+
+
+lm_resume <- lapply(levels(FAO_cap$zone), function(z){
+  df <- makedf(z)
+  
+ list(#(summary(lm(tasa_FAO~year, df))),
+  (summary(lm(pic.poc~year, df))))#,
+  #(summary(lm(chl~year, df))),
+  #(summary(lm(pic.poc~year, df))))
+})
+
+
 test <- ldply(levels(FAO_cap$zone), function(z){
   #cat("FAO area:", z, "\n");
   selec <- cointeg(z);
@@ -632,7 +652,20 @@ selec_vecm2
 ```{r,echo=FALSE, warning=FALSE, message=FALSE}
 
 global_level <- makedf(levels(FAO_cap$zone))
-global_diff <- makedf_ts(levels(FAO_cap$zone))
+#global_diff <- makedf_ts(levels(FAO_cap$zone))
+
+colMeans(global_level)
+apply(global_level,2,FUN=sd)
+
+summary(lm(tasa_FAO ~ year, as.data.frame(global_level)))
+summary(lm(sst ~ year, as.data.frame(global_level)))
+
+summary(lm(chl ~ year, as.data.frame(global_level)))
+summary(lm(pic.poc ~ year, as.data.frame(global_level)))
+
+
+
+
 
 library(tsDyn)
 
@@ -679,8 +712,6 @@ lm_test <- lapply(c("Global"),function(z) {
   })
 
 
-#ㅇㅕ기 할차례
-#그래프만들자
 
 library(plotly)
 #packageVersion('plotly')
