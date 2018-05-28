@@ -226,13 +226,16 @@ cointeg <- function(fao_zone){
                           error = function(e) as.numeric(NA))
   normality <-  tryCatch(serial.test(vv, lags.pt=7, type="PT.adjusted")$serial$p.value,
                          error = function(e) as.numeric(NA))
+  jbtest <-  tryCatch(normality.test(vv)$jb.mul$JB$p.value,
+                         error = function(e) as.numeric(NA))
+
   bic_value <- CV(vv$varresult$tasa_FAO)[[c(4)]]
   r2 <- CV(vv$varresult$tasa_FAO)[[c(5)]]
   causal <- tryCatch(causality(vv, cause = colnames(vv$y)[-1])$Granger$p.value,
                      error = function(e) NA) 
   
-  lt <- data.frame("max_I(d)"=max_id,"lag"=vv$p,"p_value"=pvalue,"BIC"=bic_value,
-                   "RMSE"=rmse_value, "normality"=normality, "R2"=r2,
+  lt <- data.frame("max_I(d)"=max_id,"lag"=vv$p,"p_value"=pvalue, "R2"=r2, "BIC"=bic_value,
+                   "RMSE"=rmse_value, "normality"=normality, "JB-Test"=jbtest,
                    "causal" = causal)
  # cat("MIAU\n")
   
@@ -293,7 +296,8 @@ test[order(test$BIC),]
 test_vecm <- test[test$rank != 0,]
 #VECM (lag=1)
 library(tsDyn)
-selec_vecm <- mdply(test_vecm[,c(1:4,17)], function(zone, variables_1, variables_2, variables_3, rank){
+selec_vecm <- mdply(test_vecm[,c(1:4,18)], 
+                    function(zone, variables_1, variables_2, variables_3, rank){
  
   
   level <- makedf(zone)
@@ -445,6 +449,7 @@ vecm_model <- VECM(level[,c("tasa_FAO","sst")], lag=1, estim = c("ML"))
 vectovar <- (vec2var(cajo,r=1  ))
 
 summary(cajorls_model$rlm)
+normality.test(vectovar)$jb.mul$JB
 
 
 ```
@@ -607,7 +612,7 @@ global_test[ global_test$p_value < 0.05 ,]
 global_test_vecm <- global_test[global_test$rank != 0,]
 #VECM (lag=1)
 library(tsDyn)
-selec_vecm <- mdply(global_test_vecm[,c(1:4,17)], function(zone, variables_1, variables_2, variables_3, rank){
+selec_vecm <- mdply(global_test_vecm[,c(1:4,18)], function(zone, variables_1, variables_2, variables_3, rank){
  
   if(zone == "Global"){
     zone <- levels(FAO_cap$zone)
