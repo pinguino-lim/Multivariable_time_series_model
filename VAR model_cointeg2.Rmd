@@ -1,29 +1,24 @@
 ---
 title: "VAR model_cointeg"
 author: "Hyelim Park"
-#date: '2018 3 13 '
+#date: '2018 6 28 '
 output: html_document
 ---
 
 ```{r, warning=FALSE,message=FALSE, echo=FALSE}
-#R version 3.4.3 (2017-11-30) -- "Kite-Eating Tree"
-#Copyright (C) 2017 The R Foundation for Statistical Computing
-#Platform: x86_64-apple-darwin15.6.0 (64-bit)
+# R version 3.5.1 (2018-07-02) -- "Feather Spray"
+# Copyright (C) 2018 The R Foundation for Statistical Computing
+# Platform: x86_64-apple-darwin15.6.0 (64-bit)
 
 library(MASS)
 library(leaps)
 library("ggplot2")
-#library(caret)
 library(nlme)
-#library(urca)
 library(vars)
-#library(fUnitRoots)
 library(aod)
 library(zoo)
-#library(tseries)
 library(plyr)
 library(forecast)
-library('ncdf4')
 library(raster)
 library(plyr)
 require(rgeos)
@@ -31,8 +26,9 @@ require(RColorBrewer)
 library(rgdal)
 library(maptools)
 library(SpatialTools)
-#library(PBSmapping)
 library(geosphere)
+library(plotly)
+
 
 
 setwd("~/Dropbox/TESIS/R_code/Theme 1.8")
@@ -40,7 +36,6 @@ setwd("~/Dropbox/TESIS/R_code/Theme 1.8")
 Capture <- read.csv(file="fishery_2002_2015.csv",sep = ",",header=TRUE)
 Capture <- Capture[,c(seq(-3,-29,-2))]
 
-#str(Capture)
 for(i in c(2:ncol(Capture))) {
   Capture[,i] <- as.numeric(as.character(Capture[,i]), na.pass=T)}
 rm(i)
@@ -224,7 +219,7 @@ cointeg <- function(fao_zone){
                     error = function(e) as.numeric(NA))
   rmse_value <-  tryCatch(accuracy(vv$varresult[[1]])[,2],
                           error = function(e) as.numeric(NA))
-  normality <-  tryCatch(serial.test(vv, lags.pt=7, type="PT.adjusted")$serial$p.value,
+  normality <-  tryCatch(serial.test(vv, lags.bg=2, type="ES")$serial$p.value,
                          error = function(e) as.numeric(NA))
   jbtest <-  tryCatch(normality.test(vv)$jb.mul$JB$p.value,
                          error = function(e) as.numeric(NA))
@@ -267,14 +262,30 @@ resume <- ldply(levels(FAO_cap$zone), function(z){
   return(dd)})
 
 
-lm_resume <- lapply(levels(FAO_cap$zone), function(z){
+
+
+
+lm_resume <- ldply(levels(FAO_cap$zone), function(z){
+  #z=18
   df <- makedf(z)
-  
- list(#(summary(lm(tasa_FAO~year, df))),
-  (summary(lm(pic.poc~year, df))))#,
-  #(summary(lm(chl~year, df))),
-  #(summary(lm(pic.poc~year, df))))
+  dd <- data.frame("zone" = z)
+  dd$beta_tasaFAO<- c(summary(lm(tasa_FAO~year, df))$coeff[2,1])
+  dd$p_tasaFAO <- summary(lm(tasa_FAO~year, df))$coeff[2,4]
+  dd$beta_sst<- c(summary(lm(sst~year, df))$coeff[2,1])
+  dd$p_sst <- summary(lm(sst~year, df))$coeff[2,4]
+  dd$beta_chl<- c(summary(lm(chl~year, df))$coeff[2,1])
+  dd$p_chl <- summary(lm(chl~year, df))$coeff[2,4]
+  dd$beta_picpoc<- c(summary(lm(pic.poc~year, df))$coeff[2,1])
+  dd$p_picpoc <- summary(lm(pic.poc~year, df))$coeff[2,4]
+  return(dd)
 })
+
+lm_resume[lm_resume$p_tasaFAO < 0.05,1:3]
+lm_resume[lm_resume$p_sst < 0.05,c(1,4:5)]
+lm_resume[lm_resume$p_chl < 0.05,c(1,6:7)]
+lm_resume[lm_resume$p_picpoc < 0.05,c(1,8:9)]
+
+
 
 
 test <- ldply(levels(FAO_cap$zone), function(z){
@@ -293,74 +304,35 @@ test <- test_selec[!(is.na(test_selec$zone)),]
 test[order(test$BIC),]
 
 
-test_vecm <- test[test$rank != 0,]
-#VECM (lag=1)
-library(tsDyn)
-selec_vecm <- mdply(test_vecm[,c(1:4,18)], 
-                    function(zone, variables_1, variables_2, variables_3, rank){
- 
-  
-  level <- makedf(zone)
-  vari <- c(na.omit(c(variables_1, variables_2, variables_3)))
-
-  cajo<- ca.jo(level[,c("tasa_FAO",vari)], type="eigen",spec="transitory",ecdet="none",K=2)
-    cajorls_model <- cajorls(cajo, r = rank)
-    vecm_model <- VECM(level[,c("tasa_FAO",vari)], lag=1, estim = c("ML"))
-    vectovar <- (vec2var(cajo,r=1  ))
-
-      ff <- summary(cajorls_model$rlm)$`Response tasa_FAO.d`$fstatistic
-    pvalue <- pf(ff[1],ff[2],ff[3],lower.tail=F)
-
-    rmse_value <- accuracy(cajorls_model$rlm)[,2]
-
-    bic_value <- BIC(vecm_model)
-    aic_value <- AIC(vecm_model)
-    R2 <- summary(cajorls_model$rlm)$`Response tasa_FAO.d`$adj.r.squared
-    normality_test <-  tryCatch(serial.test(vectovar, lags.pt=7, type="PT.adjusted")$serial$p.value,
-           error = function(e) as.numeric(NA)) 
-    lt <- data.frame("p_value"=pvalue, "RMSE"=rmse_value,
-                     "bic"=bic_value,"aic"=aic_value, "R2"=R2, "normality"=normality_test)
-    return(lt)
-  })
-
-
-
-
-
-selec_vecm2 <- subset((selec_vecm[selec_vecm$normality > 0.05 & selec_vecm$p_value < 0.05 ,]))
-
-selec_vecm2 <- selec_vecm2[order(selec_vecm2$bic, selec_vecm2$aic),]
-
-selec_vecm2 <- selec_vecm2[!(is.na(selec_vecm2$zone)),]
-
-selec_vecm2
-
 
 
 ```
 
-## Area 18 (VECM): NO
-```{r,echo=FALSE, warning=FALSE, message=FALSE}
-level <- makedf_ts(18)
-cajo<- ca.jo(level[,c("tasa_FAO","chl","pic.poc")], type="eigen",spec="transitory",ecdet="none",K=2)
-cajorls_model <- cajorls(cajo, r = 1)
-vecm_model <- VECM(level[,c("tasa_FAO","chl","pic.poc")], lag=1, estim = c("ML"))
-vectovar <- (vec2var(cajo,r=1  ))
 
-summary(cajorls_model$rlm)
-```
-## Area 21 (VAR): both I(1), no integ.
+## Area 21 (VAR): both I(1), no integ. ->VAR in dff : no sig.
 ```{r,echo=FALSE, warning=FALSE, message=FALSE}
+cat("CHANGED!!!!\n")
 level <- makedf(21)
-model_21 <-  VAR(level[,c("tasa_FAO","chl")], lag.max = 3, ic = c("AIC"))
+dff <- makedf_ts(21)
+cajo<- ca.jo(level[,c("tasa_FAO","chl")], type="eigen",spec="transitory",ecdet="none",K=2)
+summary(cajo)
+
+model_21 <-  VAR(dff[,c("tasa_FAO","chl")], p=1)
 summary(model_21)
 
-serial.test(model_21, lags.pt=7)
-causality(model_21, cause = colnames(model_21$y)[-1])
-causality(model_21, cause = colnames(model_21$y)[-2])
+CV(model_21$varresult$tasa_FAO)
+CV(model_21$varresult$chl)
+
+accuracy(model_21$varresult$tasa_FAO)
+accuracy(model_21$varresult$chl)
 
 
-cajo<- ca.jo(level[,c("tasa_FAO","chl")], type="eigen",spec="transitory",ecdet="none",K=2)
+causality(model_21, cause = "chl")
+causality(model_21, cause = "tasa_FAO")
+
+
+serial.test(model_21, lags.bg=2, type="ES")
+normality.test(model_21)
 
 
 ```
@@ -371,129 +343,171 @@ level <- makedf(31)
 model_31 <-  VAR(level[,c("tasa_FAO","sst")], lag.max = 2, ic = c("AIC"))
 summary(model_31)
 
-serial.test(model_31, lags.pt=7)
-causality(model_31, cause = colnames(model_31$y)[-1])
-causality(model_31, cause = colnames(model_31$y)[-2])
+CV(model_31$varresult$tasa_FAO)
+CV(model_31$varresult$sst)
 
+accuracy(model_31$varresult$tasa_FAO)
+accuracy(model_31$varresult$sst)
+
+
+causality(model_31, cause = "sst")
+causality(model_31, cause = "tasa_FAO")
+
+
+serial.test(model_31, lags.bg=2, type="ES")
+normality.test(model_31)
+
+```
+
+
+## Area 41 (VAR): different I(1), no cointeg. but no one-way causality -> VAR sst
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+
+level <- makedf(41)
+dff <- makedf_ts(41)
 
 cajo<- ca.jo(level[,c("tasa_FAO","sst")], type="eigen",spec="transitory",ecdet="none",K=2)
 summary(cajo)
 
-```
-
-
-## Area 41 (VAR): cap & picpoc same I(1), cointeg. but no one-way causality -> VAR sst
-```{r,echo=FALSE, warning=FALSE, message=FALSE}
-level <- makedf(41)
-dff <- makedf_ts(41)
 model_41 <-  VAR(level[,c("tasa_FAO","sst")], lag.max = 2, ic = c("AIC"))
-causality(model_41, cause = colnames(model_41$y)[-1])
-causality(model_41, cause = colnames(model_41$y)[-2])
+
 summary(model_41)
 
 
+CV(model_41$varresult$tasa_FAO)
+CV(model_41$varresult$sst)
+
+accuracy(model_41$varresult$tasa_FAO)
+accuracy(model_41$varresult$sst)
+
+
+causality(model_41, cause = "sst")
+causality(model_41, cause = "tasa_FAO")
+
+
+serial.test(model_41, lags.bg=2, type="ES")
+normality.test(model_41)
+
 ```
 
 
 
-## Area 57 (VAR): no cointeg. 
+## Area 57 (VAR): different order, no cointeg. 
 ```{r,echo=FALSE, warning=FALSE, message=FALSE}
 level <- makedf(57)
 dff <- makedf_ts(57)
 model_57 <-  VAR(level[,c("tasa_FAO","chl")], lag.max = 2, ic = c("AIC"))
-causality(model_57, cause = colnames(model_57$y)[-1])
-causality(model_57, cause = colnames(model_57$y)[-2])
+
 summary(model_57)
 
+CV(model_57$varresult$tasa_FAO)
+CV(model_57$varresult$chl)
+
+accuracy(model_57$varresult$tasa_FAO)
+accuracy(model_57$varresult$chl)
+
+
+causality(model_57, cause = "chl")
+causality(model_57, cause = "tasa_FAO")
+
+
+serial.test(model_57, lags.bg=2, type="ES")
+normality.test(model_57)
 
 ```
 
-## Area 58 (VAR): no cointeg. 
+## Area 58 (VAR): all I(0), no cointeg. 
 ```{r,echo=FALSE, warning=FALSE, message=FALSE}
 level <- makedf(58)
 dff <- makedf_ts(58)
 model_58 <-  VAR(level[,c("tasa_FAO","chl")], lag.max = 2, ic = c("AIC"))
-causality(model_58, cause = colnames(model_57$y)[-1])
-causality(model_58, cause = colnames(model_57$y)[-2])
+
 summary(model_58)
 
+CV(model_58$varresult$tasa_FAO)
+CV(model_58$varresult$chl)
+
+accuracy(model_58$varresult$tasa_FAO)
+accuracy(model_58$varresult$chl)
+
+
+causality(model_58, cause = "chl")
+causality(model_58, cause = "tasa_FAO")
+
+
+serial.test(model_58, lags.bg=2, type="ES")
+normality.test(model_58)
 
 ```
 
-## Area 67 (VAR): same I(d), 1 cointeg 
+
+## Area 77 (VAR): same I(d) but d=0, 1 cointeg.
 ```{r,echo=FALSE, warning=FALSE, message=FALSE}
-level <- makedf(67)
+cat("CHANGED!!!!!\n")
 
-model_67 <-  VAR(level[,c("tasa_FAO","chl","pic.poc")], lag.max = 2, ic = c("AIC"))
-causality(model_67, cause = colnames(model_67$y)[-1])
-causality(model_67, cause = colnames(model_67$y)[-2])
-causality(model_67, cause = colnames(model_67$y)[-3])
-summary(model_67)
-
-
-```
-
-## Area 77 (VECM): same I(d), 1 cointeg.
-```{r,echo=FALSE, warning=FALSE, message=FALSE}
 level <- makedf(77)
 model_77 <-  VAR(level[,c("tasa_FAO","sst")], lag.max = 2, ic = c("AIC"))
 summary(model_77)
 
+causality(model_77, cause = "sst")
+causality(model_77, cause = "tasa_FAO")
 
 
-cajo<- ca.jo(level[,c("tasa_FAO","sst")], type="eigen",spec="transitory",ecdet="none",K=2)
-summary(cajo)
+CV(model_77$varresult$tasa_FAO)
+CV(model_77$varresult$sst)
 
-cajorls_model <- cajorls(cajo, r = 1)
-vecm_model <- VECM(level[,c("tasa_FAO","sst")], lag=1, estim = c("ML"))
-vectovar <- (vec2var(cajo,r=1  ))
+accuracy(model_77$varresult$tasa_FAO)
+accuracy(model_77$varresult$sst)
 
-summary(cajorls_model$rlm)
-normality.test(vectovar)$jb.mul$JB
 
+causality(model_77, cause = "sst")
+causality(model_77, cause = "tasa_FAO")
+
+
+serial.test(model_77, lags.bg=2, type="ES")
+normality.test(model_77)
 
 ```
-## Area 88 (VAR): no cointeg. 
+## Area 88 (VAR): diff I(d), no cointeg. 
 ```{r,echo=FALSE, warning=FALSE, message=FALSE}
 level <- makedf(88)
 dff <- makedf_ts(88)
 model_88 <-  VAR(level[,c("tasa_FAO","pic.poc")], lag.max = 2, ic = c("AIC"))
-causality(model_88, cause = colnames(model_88$y)[-1])
-causality(model_88, cause = colnames(model_88$y)[-2])
+
 summary(model_88)
 
+CV(model_88$varresult$tasa_FAO)
+CV(model_88$varresult$pic.poc)
+
+accuracy(model_88$varresult$tasa_FAO)
+accuracy(model_88$varresult$pic.poc)
+
+
+causality(model_88, cause = "pic.poc")
+causality(model_88, cause = "tasa_FAO")
+
+
+serial.test(model_88, lags.bg=2, type="ES")
+normality.test(model_88)
 
 ```
 ## Forcasting tasa_FAO
 ```{r,echo=FALSE, warning=FALSE, message=FALSE}
-#cat("FAO 21")
-#plot(predict(model_21,n.ahead=5, ci=0.95))
-#cat("FAO 31")
-#plot(predict(model_31,5))
-#cat("FAO 41")
-#plot(predict(model_41,5))
-#cat("FAO 57")
-#plot(predict(model_57,5))
-#cat("FAO 58")
-#plot(predict(model_58,5))
-#cat("FAO 67")
-#plot(predict(model_67,5))
-#cat("FAO 77")
-#plot(predict(vectovar,5))
-#cat("FAO 88")
-#plot(predict(model_88,5))
 
-
-single_model <- mdply(cbind(list(model_21, model_31, model_41,model_57,model_58,model_67,vectovar,model_88),
-                            c("21","31","41","57","58","67","77","88")),
+single_model <- mdply(cbind(list(model_31, model_41,model_57,model_58, model_77,model_88),
+                            c("31","41","57","58","77","88")),
                       function(m,c){
+                        endo_v <- makedf(c)$tasa_FAO
+                        endo <- cbind.data.frame(endo_v,endo_v,
+                                 endo_v,endo_v)
+                        
                         pred <- predict(m,n.ahead=5, ci=0.95)
-                        endo <- cbind.data.frame(pred$endog[,1],pred$endog[,1],
-                                                 pred$endog[,1],pred$endog[,1])
+                       
                         colnames(endo) <- c("fcst","lower","upper","CI")
-                        df <- as.data.frame(rbind(endo,pred$fcst$tasa_FAO))
+                        df <- rbind(endo,as.data.frame(pred$fcst$tasa_FAO))
+
                         df$year <- 2002:2020
-                        df$zone <- rep(c,19)
+                        df$zone <- paste("FAO ",rep(c,19),sep="")
                         
                         return(df)
                       })
@@ -501,7 +515,7 @@ single_model <- mdply(cbind(list(model_21, model_31, model_41,model_57,model_58,
 single_model <- single_model[,-1]
 #colnames(single_model)
 
-lm_test <- lapply(c("21","31","41","57","58","67","77","88"),function(z) { 
+lm_test <- lapply(c("FAO 31","FAO 41","FAO 57","FAO 58","FAO 77","FAO 88"),function(z) { 
   dd <- single_model[single_model$zone %in% z,]
   ss <- summary(lm(fcst ~ year, dd))
  
@@ -511,37 +525,64 @@ lm_test <- lapply(c("21","31","41","57","58","67","77","88"),function(z) {
  # print(pf(ff[1],ff[2],ff[3],lower.tail=F))
   })
 
+single_model$lm_line <- unlist(lapply(c("FAO 31","FAO 41","FAO 57","FAO 58","FAO 77","FAO 88"),function(z) { 
+ 
+  dd <- single_model[single_model$zone %in% z,]
+  ss <- lm(fcst ~ year, dd)
+ 
+  return(ss$fitted.values)
+  }))
 
-#ㅇㅕ기 할차례
-#그래프만들자
 
-library(plotly)
-#packageVersion('plotly')
+slope <- unlist(lapply(lm_test, function(f){
+  if(f[2,4]>0.01&f[2,4]<0.05){p=paste(signif(f[2,1], digits =3),"*",sep = "")}
+  if(f[2,4]>0.001&f[2,4]<0.01){p=paste(signif(f[2,1], digits =3),"**",sep = "")}
+  if(f[2,4]<0.001){p=paste(signif(f[2,1], digits =3),"***",sep = "")}
+  if(0.05<f[2,4]){p=paste(signif(f[2,1], digits =3),"",sep = "")}
+  
+  return(p)}))
+
+annotate_slope <- list(
+  x = c(2018,2016,2017,2015,2019:2020),
+  y = single_model$lm_line[c(17,34,54,71,94,114)],
+  text = slope,
+  xref = "year",
+  yref = "fcst",
+  showarrow = TRUE,
+  arrowhead = 7,
+  ax = 20,
+  ay = -40
+)
 
 
 
-gvar <- plot_ly(single_model,x = ~year, y = ~fcst, color = ~zone)%>%
+
+
+gvar <- plot_ly(single_model,x = ~year, y = ~fcst, color = ~zone, mode = 'markers', type = 'scatter',showlegend=F)%>%
   layout(yaxis = list (title = "Capture rate (tonnes/km^2)"),
          xaxis = list (title = "Year"))%>%
-  add_lines()%>%
+  
   add_ribbons(showlegend = F,
               ymin = ~lower,
               ymax = ~upper,
               line = list(color = 'rgba(7, 164, 181, 0.05)'),
-              fillcolor = 'rgba(7, 164, 181, 0.2)')
+              fillcolor = 'rgba(7, 164, 181, 0.2)') %>%
+  layout(annotations = annotate_slope)%>%
+  add_trace(y = ~lm_line,mode = 'lines',showlegend=T)
 
 gvar
 
 #Sys.setenv("plotly_username"="pinguino.lim")
 #Sys.setenv("plotly_api_key"="wMn1rceswv2Jabna8G3K")
+#api_create(gvar, filename = "forecasting_FAO")
 
 #fao.union@data[order(fao.union$X2014, decreasing = T),]
 
 
 ```
 ## Forcasting other variable
-```{r,echo=FALSE, warning=FALSE, message=FALSE}
-single_model <- mdply(cbind(list(model_21, model_31, model_41,model_57,model_58,model_67,model_67,vectovar,model_88),
+```{echo=FALSE, warning=FALSE, message=FALSE}
+single_model <- mdply(cbind(list(model_21, model_31, model_41,model_57,model_58,model_67,model_67,model_77,model_88),
                             c("21","31","41","57","58","67_chl","67_pp","77","88"),
                             c("chl","sst","sst",
                       "chl","chl","chl","pic.poc","sst","pic.poc")),
@@ -610,47 +651,7 @@ global_test <- cointeg(levels(FAO_cap$zone))
 global_test[ global_test$p_value < 0.05 ,]
 
 global_test_vecm <- global_test[global_test$rank != 0,]
-#VECM (lag=1)
-library(tsDyn)
-selec_vecm <- mdply(global_test_vecm[,c(1:4,18)], function(zone, variables_1, variables_2, variables_3, rank){
- 
-  if(zone == "Global"){
-    zone <- levels(FAO_cap$zone)
-  }
-  level <- makedf(zone)
-  vari <- c(na.omit(c(variables_1, variables_2, variables_3)))
 
-    cajo<- ca.jo(level[,c("tasa_FAO",vari)], type="eigen",spec="transitory",ecdet="none",K=2)
-    cajorls_model <- cajorls(cajo, r = rank)
-    vecm_model <- VECM(level[,c("tasa_FAO",vari)], lag=1, estim = c("ML"))
-    vectovar <- (vec2var(cajo,r=1  ))
-
-      ff <- summary(cajorls_model$rlm)$`Response tasa_FAO.d`$fstatistic
-    pvalue <- pf(ff[1],ff[2],ff[3],lower.tail=F)
-
-    rmse_value <- accuracy(cajorls_model$rlm)[,2]
-
-    bic_value <- BIC(vecm_model)
-    aic_value <- AIC(vecm_model)
-    R2 <- summary(cajorls_model$rlm)$`Response tasa_FAO.d`$adj.r.squared
-    normality_test <-  tryCatch(serial.test(vectovar, lags.pt=7, type="PT.adjusted")$serial$p.value,
-           error = function(e) as.numeric(NA)) 
-    lt <- data.frame("p_value"=pvalue, "RMSE"=rmse_value,
-                     "bic"=bic_value,"aic"=aic_value, "R2"=R2, "normality"=normality_test)
-    return(lt)
-  })
-
-
-
-
-
-selec_vecm2 <- subset((selec_vecm[selec_vecm$normality > 0.05 & selec_vecm$p_value < 0.05 ,]))
-
-selec_vecm2 <- selec_vecm2[order(selec_vecm2$bic, selec_vecm2$aic),]
-
-selec_vecm2 <- selec_vecm2[!(is.na(selec_vecm2$zone)),]
-
-selec_vecm2
 
 ```
 ##VECM_Global no exist -> VAR
@@ -668,25 +669,36 @@ summary(lm(sst ~ year, as.data.frame(global_level)))
 summary(lm(chl ~ year, as.data.frame(global_level)))
 summary(lm(pic.poc ~ year, as.data.frame(global_level)))
 
-
-
-
-
-library(tsDyn)
-
-cajo<- ca.jo(global_level[,c("tasa_FAO","sst")], type="trace",spec="transitory",ecdet="none",K=2)
-cajorls_model <- cajorls(cajo, r = 1)
-vecm_model <- VECM(global_level[,c("tasa_FAO","sst")], lag=1, estim = c("ML"))
-vectovar <- (vec2var(cajo,r=1  ))
-
+cajo<- ca.jo(global_level[,c("tasa_FAO","sst")], type="eigen",spec="transitory",ecdet="none",K=2)
 summary(cajo)
-summary(cajorls_model$rlm)
+
+
 
 print("global_level")
 global_model <-  VAR(global_level[,c("tasa_FAO","sst")], lag.max = 2, ic = c("AIC"))
 summary(global_model)
+CV(global_model$varresult$tasa_FAO)
+CV(global_model$varresult$sst)
 
-serial.test(global_model, lags.pt=2)
+accuracy(global_model$varresult$tasa_FAO)
+accuracy(global_model$varresult$sst)
+
+
+causality(global_model, cause = "sst")
+causality(global_model, cause = "tasa_FAO")
+
+
+serial.test(global_model, lags.bg=2, type="ES")
+normality.test(global_model)
+
+
+
+
+
+
+
+
+
 #plot(predict(global_model,n.ahead=5, ci=0.95))
 
 single_g_model <- mdply(cbind(list(global_model),
@@ -716,23 +728,52 @@ lm_test <- lapply(c("Global"),function(z) {
  # print(pf(ff[1],ff[2],ff[3],lower.tail=F))
   })
 
+single_g_model$lm_line <- unlist(lapply(c("Global"),function(z) { 
+  dd <- single_g_model[single_g_model$zone %in% z,]
+  ss <- lm(fcst ~ year, dd)
+ 
+  return(ss$fitted.values)
+  }))
 
+slope <- unlist(lapply(lm_test, function(f){
+  if(f[2,4]>0.01&f[2,4]<0.05){p=paste(signif(f[2,1], digits =3),"*",sep = "")}
+  if(f[2,4]>0.001&f[2,4]<0.01){p=paste(signif(f[2,1], digits =3),"**",sep = "")}
+  if(f[2,4]<0.001){p=paste(signif(f[2,1], digits =3),"***",sep = "")}
+  if(0.05<f[2,4]){p=paste(signif(f[2,1], digits =3),"",sep = "")}
+  
+  return(p)}))
+
+annotate_slope <- list(
+  x = 2017,
+  y = single_g_model$lm_line[single_g_model$year %in% 2017],
+  text = slope,
+  xref = "year",
+  yref = "fcst",
+  showarrow = TRUE,
+  arrowhead = 7,
+  ax = 20,
+  ay = -40
+)
 
 library(plotly)
 #packageVersion('plotly')
 
 
 
-gvar <- plot_ly(single_g_model,x = ~year, y = ~fcst, color = ~zone)%>%
+gvar <- plot_ly(single_g_model,x = ~year, y = ~fcst, color = ~zone, 
+                mode = 'markers', type = 'scatter',showlegend=F)%>%
   layout(yaxis = list (title = "Capture rate (tonnes/km^2)"),
          xaxis = list (title = "Year"))%>%
-  add_lines()%>%
   add_ribbons(showlegend = F,
               ymin = ~lower,
               ymax = ~upper,
               line = list(color = 'rgba(7, 164, 181, 0.05)'),
-              fillcolor = 'rgba(7, 164, 181, 0.2)')
+              fillcolor = 'rgba(7, 164, 181, 0.2)') %>%
+  layout(annotations = annotate_slope)%>%
+  add_trace(y = ~lm_line,mode = 'lines',showlegend=T)
 
 gvar
+
+#api_create(gvar, filename = "forecasting_Global")
 
 ```
